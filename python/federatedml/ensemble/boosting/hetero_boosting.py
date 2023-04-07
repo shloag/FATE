@@ -21,7 +21,7 @@ from abc import ABC
 import abc
 from federatedml.ensemble.boosting import Boosting
 from federatedml.param.boosting_param import HeteroBoostingParam
-from federatedml.secureprotol import PaillierEncrypt, IpclPaillierEncrypt
+from federatedml.secureprotol import PaillierEncrypt, IpclPaillierEncrypt, CKKSEncrypt
 from federatedml.util import consts
 from federatedml.feature.binning.quantile_binning import QuantileBinning
 from federatedml.util.classify_label_checker import ClassifyLabelChecker
@@ -71,6 +71,10 @@ class HeteroBoostingGuest(HeteroBoosting, ABC):
         elif self.encrypt_param.method.lower() == consts.PAILLIER_IPCL.lower():
             self.encrypter = IpclPaillierEncrypt()
             self.encrypter.generate_key(self.encrypt_param.key_length)
+        elif self.encrypt_param.method.lower() == consts.CKKS.lower():
+            self.encrypter = CKKSEncrypt()
+            self.encrypter.generate_key(self.encrypt_param.poly_modulus_degree, self.encrypt_param.coeff_mod_bit_sizes,
+                                        self.encrypt_param.global_scale)
         else:
             raise NotImplementedError("unknown encrypt type {}".format(self.encrypt_param.method.lower()))
 
