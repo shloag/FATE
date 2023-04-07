@@ -24,7 +24,7 @@ from federatedml.nn.backend.torch.interactive import InteractiveLayer
 from federatedml.nn.backend.torch.serialization import recover_sequential_from_dict
 from federatedml.util.fixpoint_solver import FixedPointEncoder
 from federatedml.protobuf.generated.hetero_nn_model_param_pb2 import InteractiveLayerParam
-from federatedml.secureprotol import PaillierEncrypt
+from federatedml.secureprotol import PaillierEncrypt, CKKSEncrypt
 from federatedml.util import consts, LOGGER
 from federatedml.nn.hetero.interactive.utils.numpy_layer import NumpyDenseLayerGuest, NumpyDenseLayerHost
 from federatedml.secureprotol.paillier_tensor import PaillierTensor
@@ -949,6 +949,13 @@ class HEInteractiveLayerHost(InteractiveLayerHost):
         if param.encrypt_param.method.lower() == consts.PAILLIER.lower():
             encrypter = PaillierEncrypt()
             encrypter.generate_key(param.encrypt_param.key_length)
+        elif param.encrypt_param.method.lower() == consts.CKKS.lower():
+            encrypter = CKKSEncrypt()
+            encrypter.generate_key(
+                param.encrypt_param.poly_modulus_degree,
+                param.encrypt_param.coeff_mod_bit_sizes,
+                param.encrypt_param.global_scale
+            )
         else:
             raise NotImplementedError("encrypt method not supported yet!!!")
 
