@@ -2,7 +2,7 @@ import numpy as np
 import tenseal as ts
 
 from federatedml.util import LOGGER
-
+from tenseal.enc_context import Context
 
 class CKKSKeypair(object):
     @staticmethod
@@ -19,19 +19,19 @@ class CKKSKeypair(object):
         )
         context.global_scale = global_scale
 
-        secret_key = context.secret_key()
+        private_key = CKKSPrivateKey(context.copy())
 
         context.make_context_public()
         public_context = context
 
         public_key = CKKSPublicKey(public_context)
-        private_key = CKKSPrivateKey(secret_key)
+
         return public_key, private_key
 
 
 class CKKSPublicKey(object):
     def __init__(self, public_context):
-        if not isinstance(public_context, ts.enc_context.Context):
+        if not isinstance(public_context, Context):
             raise TypeError("public_context should be a tenseal Context object")
         elif not public_context.is_public():
             raise ValueError("public_context is not a public context")
@@ -69,11 +69,11 @@ class CKKSPublicKey(object):
 
 
 class CKKSPrivateKey(object):
-    def __init__(self, secret_key):
-        if not isinstance(secret_key, ts.enc_context.SecretKey):
-            raise TypeError("secret_key should be a tenseal SecretKey object")
+    def __init__(self, context):
+        if not (isinstance(context, Context) and context.is_private()):
+            raise TypeError("context should be a tenseal Context object")
 
-        self.__secret_key = secret_key
+        self.__context = context
 
     def decrypt(self, encrypted_vector):
         """Decrypt a CKKSEncryptedNumber"""
@@ -81,9 +81,19 @@ class CKKSPrivateKey(object):
             raise ValueError("encrypted_vector should be a CKKSEncryptedVector")
 
         ts_encrypted_vector = encrypted_vector._get_tenseal_encrypted_vector()
-        decrypted_vector = ts_encrypted_vector.decrypt(self.__secret_key)
+        decrypted_vector = ts_encrypted_vector.decrypt(self.__context.secret_key())
         return decrypted_vector[0] if len(decrypted_vector) == 1 else decrypted_vector
 
+    def __getstate__(self):
+        return self.__context.serialize(
+            save_public_key=False,
+            save_secret_key=True,
+            save_relin_keys=True,
+            save_galois_keys=False)
+
+    def __setstate__(self, state):
+        self.__context = ts.context_from(state)
+    
 
 class CKKSEncryptedVector(object):
     def __init__(self, encrypted_vector, context, depth=0):
