@@ -18,7 +18,11 @@
         }
     ],
     "tasks": {
-        "hetero_nn_train_binary_ckks": {
+        "hetero_nn_train_binary_coae_ckks (This one will fail)": {
+            "conf": "hetero_nn_train_binary_coae_ckks_conf.json",
+            "dsl": "hetero_nn_train_binary_coae_ckks_dsl.json"
+        },
+        "hetero_nn_train_binary_ckks (This one should pass)": {
             "conf": "hetero_nn_train_binary_ckks_conf.json",
             "dsl": "hetero_nn_train_binary_ckks_dsl.json"
         }
