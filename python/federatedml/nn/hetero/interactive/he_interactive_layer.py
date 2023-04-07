@@ -28,6 +28,7 @@ from federatedml.secureprotol import PaillierEncrypt, CKKSEncrypt
 from federatedml.util import consts, LOGGER
 from federatedml.nn.hetero.interactive.utils.numpy_layer import NumpyDenseLayerGuest, NumpyDenseLayerHost
 from federatedml.secureprotol.paillier_tensor import PaillierTensor
+from federatedml.secureprotol.ckks_tensor import CKKSTensor
 from federatedml.nn.hetero.nn_component.torch_model import TorchNNModel
 from federatedml.transfer_variable.base_transfer_variable import BaseTransferVariables
 from fate_arch.session import computing_session as session
@@ -170,6 +171,9 @@ class HEInteractiveLayerGuest(InteractiveLayerGuest):
         # float64
         self.float64 = False
 
+        self.encrypt_method = consts.CKKS if params.encrypt_param.method.lower() == consts.CKKS else consts.PAILLIER
+        self.tensor_type = CKKSTensor if self.encrypt_method == consts.CKKS else PaillierTensor
+
     """
     Init functions
     """
@@ -192,7 +196,7 @@ class HEInteractiveLayerGuest(InteractiveLayerGuest):
             raise ValueError('torch interactive model is not initialized!')
 
         for i in range(self.host_num):
-            host_model = NumpyDenseLayerHost()
+            host_model = NumpyDenseLayerHost(self.tensor_type)
             host_model.build(self.model.host_model[i])
             host_model.set_learning_rate(self.learning_rate)
             self.host_model_list.append(host_model)
@@ -411,9 +415,9 @@ class HEInteractiveLayerGuest(InteractiveLayerGuest):
         merge_output = None
         for idx, (outputs, noise) in enumerate(
                 zip(decrypted_dense_outputs, guest_nosies)):
-            out = PaillierTensor(outputs) - noise
+            out = self.tensor_type(outputs) - noise
             if len(mask_table_list) != 0:
-                out = PaillierTensor(
+                out = self.tensor_type(
                     out.get_obj().join(
                         mask_table_list[idx],
                         self.expand_columns))
@@ -458,7 +462,7 @@ class HEInteractiveLayerGuest(InteractiveLayerGuest):
         host_bottom_inputs_tensor = []
         host_input_shapes = []
         for i in host_inputs:
-            pt = PaillierTensor(i)
+            pt = self.tensor_type(i)
             host_bottom_inputs_tensor.append(pt)
             host_input_shapes.append(pt.shape[1])
 
@@ -484,7 +488,7 @@ class HEInteractiveLayerGuest(InteractiveLayerGuest):
 
         if guest_output is not None:
             dense_output_data = host_output + \
-                PaillierTensor(guest_output, partitions=self.partitions)
+                self.tensor_type(guest_output, partitions=self.partitions)
         else:
             dense_output_data = host_output
 
@@ -632,7 +636,7 @@ class HEInteractiveLayerGuest(InteractiveLayerGuest):
             activation_gradient,
             weight_gradient,
             acc_noise):
-        activation_gradient_tensor = PaillierTensor(
+        activation_gradient_tensor = self.tensor_type(
             activation_gradient, partitions=self.partitions)
         input_gradient = host_model.get_input_gradient(
             activation_gradient_tensor, acc_noise, encoder=self.fixed_point_encoder)
@@ -742,7 +746,10 @@ class HEInteractiveLayerHost(InteractiveLayerHost):
         self.plaintext = PLAINTEXT
         self.acc_noise = None
         self.learning_rate = params.interactive_layer_lr
-        self.encrypter = self.generate_encrypter(params)
+        self.encrypter, self.encrypt_method = self.generate_encrypter(params)
+
+        self.tensor_class = CKKSTensor if self.encrypt_method==consts.CKKS else PaillierTensor
+
         self.transfer_variable = HEInteractiveTransferVariable()
         self.partitions = 1
         self.input_shape = None
@@ -794,13 +801,14 @@ class HEInteractiveLayerHost(InteractiveLayerHost):
         LOGGER.info(
             "forward propagation: encrypt host_bottom_output of epoch {} batch {}".format(
                 epoch, batch))
-        host_input = PaillierTensor(host_input, partitions=self.partitions)
+        host_input = self.tensor_class(host_input, partitions=self.partitions)
 
         encrypted_host_input = host_input.encrypt(self.encrypter)
         self.send_forward_to_guest(
             encrypted_host_input.get_obj(), epoch, batch, train)
 
-        encrypted_guest_forward = PaillierTensor(
+
+        encrypted_guest_forward = self.tensor_class(
             self.get_guest_encrypted_forward_from_guest(epoch, batch))
         decrypted_guest_forward = encrypted_guest_forward.decrypt(
             self.encrypter)
@@ -866,7 +874,7 @@ class HEInteractiveLayerHost(InteractiveLayerHost):
         self.send_encrypted_acc_noise_to_guest(
             encrypted_acc_noise, epoch, batch)
         self.acc_noise += noise_weight_gradient
-        host_input_gradient = PaillierTensor(
+        host_input_gradient = self.tensor_class(
             self.get_host_backward_from_guest(epoch, batch))
         host_input_gradient = host_input_gradient.decrypt(self.encrypter)
 
@@ -949,6 +957,7 @@ class HEInteractiveLayerHost(InteractiveLayerHost):
         if param.encrypt_param.method.lower() == consts.PAILLIER.lower():
             encrypter = PaillierEncrypt()
             encrypter.generate_key(param.encrypt_param.key_length)
+            encrypt_method = consts.PAILLIER
         elif param.encrypt_param.method.lower() == consts.CKKS.lower():
             encrypter = CKKSEncrypt()
             encrypter.generate_key(
@@ -956,10 +965,11 @@ class HEInteractiveLayerHost(InteractiveLayerHost):
                 param.encrypt_param.coeff_mod_bit_sizes,
                 param.encrypt_param.global_scale
             )
+            encrypt_method = consts.CKKS
         else:
             raise NotImplementedError("encrypt method not supported yet!!!")
 
-        return encrypter
+        return encrypter, encrypt_method
 
     """
     Model IO
