@@ -1,7 +1,8 @@
 import random
+from federatedml.util import consts
 from fate_arch.session import computing_session
 import numpy as np
-from federatedml.secureprotol.paillier_tensor import PaillierTensor
+from federatedml.secureprotol.tensor_util import get_tensor
 
 
 BITS = 10
@@ -66,12 +67,13 @@ class RandomNumberGenerator(object):
             shape,
             partition=10,
             mixed_rate=MIXED_RATE,
-            keep_table=None):
+            keep_table=None,
+            encrypt_method=consts.PAILLIER):
         if keep_table:
             tb = keep_table.mapValues(
                 lambda keep_array: self.generate_random_number(
                     keep=keep_array, mixed_rate=mixed_rate))
-            return PaillierTensor(tb)
+            return get_tensor(tb, type=encrypt_method)
         else:
             tb = computing_session.parallelize(
                 [None for _ in range(shape[0])], include_key=False, partition=partition)
@@ -79,4 +81,4 @@ class RandomNumberGenerator(object):
             tb = tb.mapValues(lambda val: self.generate_random_number(
                 shape[1:], mixed_rate=mixed_rate))
 
-            return PaillierTensor(tb)
+            return get_tensor(tb, type=encrypt_method)
