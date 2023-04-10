@@ -1,9 +1,7 @@
-from typing import Union
 import torch
 import numpy as np
 from federatedml.util import consts
-from federatedml.secureprotol.paillier_tensor import PaillierTensor
-from federatedml.secureprotol.ckks_tensor import CKKSTensor
+import federatedml.secureprotol.tensor_util as util
 
 
 class NumpyDenseLayer(object):
@@ -162,10 +160,13 @@ class NumpyDenseLayerHost(NumpyDenseLayer):
     This dense layer can directly compute pallier-tensor forward
     """
 
-    def __init__(self, tensor_class: Union[PaillierTensor, CKKSTensor]):
+    def __init__(self, encrypt_method=consts.PAILLIER):
         super(NumpyDenseLayerHost, self).__init__()
         self.role = consts.HOST
-        self.tensor_class = tensor_class
+        self.encrypt_method = encrypt_method
+
+    def get_tensor(self, obj, partitions=1):
+        return util.get_tensor(obj, partitions, self.encrypt_method)
 
     def select_backward_sample(self, selective_ids):
 
@@ -178,7 +179,7 @@ class NumpyDenseLayerHost(NumpyDenseLayer):
                 .filter(lambda k, v: k in id_map)
                 .map(lambda k, v: (id_map[k], v))
             )
-            self.input_cached = self.tensor_class(self.input_cached)
+            self.input_cached = self.get_tensor(self.input_cached)
             self.activation_cached = self.activation_input[selective_ids]
         else:
 
@@ -187,8 +188,8 @@ class NumpyDenseLayerHost(NumpyDenseLayer):
                 .filter(lambda k, v: k in id_map)
                 .map(lambda k, v: (id_map[k], v))
             )
-            self.input_cached = self.tensor_class(
-                self.input_cached.get_obj().union(selective_input)
+            self.input_cached = self.get_tensor(
+                self.input_cached.get_obj().union(selective_input),
             )
             self.activation_cached = np.vstack(
                 (self.activation_cached, self.activation_input[selective_ids])
@@ -221,13 +222,13 @@ class NumpyDenseLayerHost(NumpyDenseLayer):
 
         if self.do_backward_selective_strategy:
             batch_size = self.batch_size
-            self.input = self.tensor_class(
-                self.input_cached.get_obj().filter(lambda k, v: k < batch_size)
+            self.input = self.get_tensor(
+                self.input_cached.get_obj().filter(lambda k, v: k < batch_size),
             )
-            self.input_cached = self.tensor_class(
+            self.input_cached = self.get_tensor(
                 self.input_cached.get_obj()
-                .filter(lambda k, v: k >= batch_size)
-                .map(lambda k, v: (k - batch_size, v))
+                    .filter(lambda k, v: k >= batch_size)
+                    .map(lambda k, v: (k - batch_size, v)),
             )
 
         if encoder:
