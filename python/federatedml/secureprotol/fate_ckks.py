@@ -161,6 +161,9 @@ class CKKSEncryptedVector(object):
         except ValueError as e:
             LOGGER.debug(f'Scale out of bound, current depth = {self.__depth+1}')
             raise e
+        
+    def __truediv__(self, other):
+        return self * (1/other)
 
     def _get_tenseal_encrypted_vector(self):
         """Should only be called by CKKSPrivateKey"""
