@@ -1,4 +1,5 @@
 import numpy as np
+import federatedml.secureprotol.tensor_util as util
 from federatedml.param.hetero_nn_param import HeteroNNParam
 from federatedml.transfer_variable.base_transfer_variable import BaseTransferVariables
 
@@ -9,6 +10,7 @@ class InteractiveLayerBase(object):
 
         self.params = params
         self.transfer_variable: BaseTransferVariables = None
+        self.encrypt_method = params.encrypt_param.method
 
     def set_flow_id(self, flow_id):
         if self.transfer_variable is not None:
@@ -37,6 +39,9 @@ class InteractiveLayerBase(object):
 
     def set_backward_select_strategy(self):
         pass
+
+    def get_tensor(self, obj, partitions=1):
+        return util.get_tensor(obj, partitions, self.encrypt_method)
 
 
 class InteractiveLayerGuest(InteractiveLayerBase):
