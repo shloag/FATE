@@ -27,8 +27,7 @@ from pipeline.interface import Data, Model
 from pipeline.utils.tools import load_job_config, JobConfig
 from pipeline.runtime.entity import JobParameters
 
-from fate_test.utils import extract_data, parse_summary_result
-from federatedml.evaluation.metrics import classification_metric
+from fate_test.utils import parse_summary_result
 
 
 def main(config="../../config.yaml", param="./lr_config.yaml", namespace=""):
@@ -45,21 +44,8 @@ def main(config="../../config.yaml", param="./lr_config.yaml", namespace=""):
 
     assert isinstance(param, dict)
 
-    data_set = param.get("data_guest").split('/')[-1]
-    if data_set == "default_credit_hetero_guest.csv":
-        guest_data_table = 'default_credit_hetero_guest'
-        host_data_table = 'default_credit_hetero_host'
-    elif data_set == 'breast_hetero_guest.csv':
-        guest_data_table = 'breast_hetero_guest'
-        host_data_table = 'breast_hetero_host'
-    elif data_set == 'give_credit_hetero_guest.csv':
-        guest_data_table = 'give_credit_hetero_guest'
-        host_data_table = 'give_credit_hetero_host'
-    elif data_set == 'epsilon_5k_hetero_guest.csv':
-        guest_data_table = 'epsilon_5k_hetero_guest'
-        host_data_table = 'epsilon_5k_hetero_host'
-    else:
-        raise ValueError(f"Cannot recognized data_set: {data_set}")
+    guest_data_table = param["guest_data_table"]
+    host_data_table = param["host_data_table"]
 
     guest_train_data = {"name": guest_data_table, "namespace": f"experiment{namespace}"}
     host_train_data = {"name": host_data_table, "namespace": f"experiment{namespace}"}
@@ -108,7 +94,7 @@ def main(config="../../config.yaml", param="./lr_config.yaml", namespace=""):
         "floating_point_precision": param.get("floating_point_precision"),
         "init_param": {
             "init_method": param.get("init_method", 'random_uniform'),
-            "random_seed": param.get("random_seed", 103)
+            "random_seed": param["seed"]
         },
         "encrypt_param": {
             "method": "ckks"
@@ -119,7 +105,7 @@ def main(config="../../config.yaml", param="./lr_config.yaml", namespace=""):
     hetero_lr_0 = HeteroLR(name='hetero_lr_0', **lr_param)
     hetero_lr_1 = HeteroLR(name='hetero_lr_1')
 
-    evaluation_0 = Evaluation(name='evaluation_0', eval_type="binary")
+    evaluation_0 = Evaluation(name='evaluation_0', eval_type="binary", metrics=param["metrics"])
 
     # add components to pipeline, in order of task execution
     pipeline.add_component(reader_0)
@@ -136,21 +122,7 @@ def main(config="../../config.yaml", param="./lr_config.yaml", namespace=""):
     # fit model
     job_parameters = JobParameters()
     pipeline.fit(job_parameters)
-    lr_0_data = pipeline.get_component("hetero_lr_0").get_output_data()
-    lr_1_data = pipeline.get_component("hetero_lr_1").get_output_data()
-    lr_0_score = extract_data(lr_0_data, "predict_result")
-    lr_0_label = extract_data(lr_0_data, "label")
-    lr_1_score = extract_data(lr_1_data, "predict_result")
-    lr_1_label = extract_data(lr_1_data, "label")
-    lr_0_score_label = extract_data(lr_0_data, "predict_result", keep_id=True)
-    lr_1_score_label = extract_data(lr_1_data, "predict_result", keep_id=True)
     result_summary = parse_summary_result(pipeline.get_component("evaluation_0").get_summary())
-    metric_lr = {
-        "score_diversity_ratio": classification_metric.Distribution.compute(lr_0_score_label, lr_1_score_label),
-        "ks_2samp": classification_metric.KSTest.compute(lr_0_score, lr_1_score),
-        "mAP_D_value": classification_metric.AveragePrecisionScore().compute(lr_0_score, lr_1_score, lr_0_label,
-                                                                             lr_1_label)}
-    result_summary["distribution_metrics"] = {"hetero_lr": metric_lr}
 
     data_summary = {"train": {"guest": guest_train_data["name"], "host": host_train_data["name"]},
                     "test": {"guest": guest_train_data["name"], "host": host_train_data["name"]}
