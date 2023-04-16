@@ -1,0 +1,33 @@
+{
+    "data": [
+        {
+            "file": "../../data/breast_hetero_mini_host.csv",
+            "head": 1,
+            "partition": 16,
+            "table_name": "breast_hetero_mini_host",
+            "namespace": "experiment",
+            "role": "host_0"
+        },
+        {
+            "file": "../../data/breast_hetero_mini_guest.csv",
+            "head": 1,
+            "partition": 16,
+            "table_name": "breast_hetero_mini_guest",
+            "namespace": "experiment",
+            "role": "guest_0"
+        }
+    ],
+    "hetero_nn-binary-0": {
+        "Paillier": {
+            "script": "./hetero_nn_paillier.py",
+            "conf": "./hetero_nn_breast_config.yaml"
+        },
+        "CKKS": {
+            "script": "./hetero_nn_ckks.py",
+            "conf": "./hetero_nn_breast_config.yaml"
+        },
+        "compare_setting": {
+            "relative_tol": 1e-2
+        }
+    }
+}
