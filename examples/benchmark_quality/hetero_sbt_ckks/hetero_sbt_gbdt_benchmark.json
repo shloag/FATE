@@ -1,0 +1,33 @@
+{
+    "data": [
+        {
+            "file": "examples/data/breast_hetero_tiny_host.csv",
+            "head": 1,
+            "partition": 16,
+            "table_name": "breast_hetero_tiny_host",
+            "namespace": "experiment",
+            "role": "host_0"
+        },
+        {
+            "file": "examples/data/breast_hetero_tiny_guest.csv",
+            "head": 1,
+            "partition": 16,
+            "table_name": "breast_hetero_tiny_guest",
+            "namespace": "experiment",
+            "role": "guest_0"
+        }
+    ],
+    "hetero_sbt-binary-0": {
+        "CKKS": {
+            "script": "./fate-sbt-ckks.py",
+            "conf": "./fate_sbt.yaml"
+        },
+        "Paillier": {
+            "script": "./fate-sbt-paillier.py",
+            "conf": "./fate_sbt.yaml"
+        },
+        "compare_setting": {
+            "relative_tol": 1e-2
+        }
+    }
+}

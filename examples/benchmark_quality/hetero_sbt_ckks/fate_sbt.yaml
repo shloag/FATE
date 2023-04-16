@@ -1,0 +1,12 @@
+data_guest_train: "breast_hetero_tiny_guest"
+data_guest_val: "breast_hetero_tiny_guest"
+data_host_train: "breast_hetero_tiny_host"
+data_host_val: "breast_hetero_tiny_host"
+eval_type: "binary"
+task_type: "classification"
+loss_func: "cross_entropy"
+tree_depth: 2
+tree_num: 2
+learning_rate: 0.15
+random_seed: 4981
+metrics: ['auc', 'ks']
