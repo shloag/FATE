@@ -126,7 +126,15 @@ class CKKSEncryptedVector(object):
 
     def __add__(self, other):
         if isinstance(other, CKKSEncryptedVector):
-            self.__encrypted_vector += other.__encrypted_vector
+            try:
+                self.__encrypted_vector += other.__encrypted_vector
+
+            except RuntimeError as e:
+                if CKKSEncryptedVector.is_transparent_ciphertext_error(e):
+                    self.__encrypted_vector += (other.__encrypted_vector + ts.ckks_vector(other.__context, [0]))
+                else:
+                    raise e
+                
         else:
             self.__encrypted_vector += other
         return self
@@ -136,7 +144,15 @@ class CKKSEncryptedVector(object):
 
     def __sub__(self, other):
         if isinstance(other, CKKSEncryptedVector):
-            self.__encrypted_vector = self.__encrypted_vector - other.__encrypted_vector
+            try:
+                self.__encrypted_vector = self.__encrypted_vector - other.__encrypted_vector
+
+            except RuntimeError as e:
+                if CKKSEncryptedVector.is_transparent_ciphertext_error(e):
+                    self.__encrypted_vector -= (other.__encrypted_vector + ts.ckks_vector(other.__context, [0]))
+                else:
+                    raise e
+
         else:
             self.__encrypted_vector = self.__encrypted_vector - other
         return self
@@ -168,3 +184,11 @@ class CKKSEncryptedVector(object):
     def _get_tenseal_encrypted_vector(self):
         """Should only be called by CKKSPrivateKey"""
         return self.__encrypted_vector
+    
+    @staticmethod
+    def is_transparent_ciphertext_error(e: RuntimeError) -> bool:
+        '''
+        Checks if the specified exception is caused by transparent ciphertext error in tenseal
+        '''
+        return str(e) == "result ciphertext is transparent"
+    
