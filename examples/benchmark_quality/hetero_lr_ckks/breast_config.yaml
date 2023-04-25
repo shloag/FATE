@@ -1,0 +1,15 @@
+data_guest: "examples/data/breast_hetero_mini_guest.csv"
+data_host: "examples/data/breast_hetero_mini_host.csv"
+guest_data_table: "breast_hetero_mini_guest"
+host_data_table: "breast_hetero_mini_host"
+idx: "id"
+label_name: "y"
+penalty: "L2"
+max_iter: 2
+alpha: 0.01
+learning_rate: 0.15
+optimizer: "rmsprop"
+batch_size: 64
+early_stop: "diff"
+metrics: ["auc", "ks"]
+seed: 4981
